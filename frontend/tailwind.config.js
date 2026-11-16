@@ -14,8 +14,8 @@ export default {
           200: '#bae6fd',
           300: '#7dd3fc',
           400: '#38bdf8',
-          500: '#0284c7', // Primary Intelligent Laundry Blue
-          600: '#0369a1', // Deep Intelligent Laundry Blue
+          500: '#0284c7', // Primary Miracle Laundry Blue
+          600: '#0369a1', // Deep Miracle Laundry Blue
           700: '#075985',
           800: '#0c4a6e',
           900: '#0a3651',

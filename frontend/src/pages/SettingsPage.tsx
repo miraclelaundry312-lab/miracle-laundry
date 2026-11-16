@@ -1,27 +1,63 @@
 import React, { useState, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   fetchSettings,
   updateSettingsApi,
   clearAllDataApi,
   downloadMasterExcelBackupApi,
   restoreMasterExcelBackupApi,
-  fetchWhatsAppStatus,
-  disconnectWhatsAppApi,
   importOldAppOrdersJsonApi,
 } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { Setting } from '../types';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
-import { Settings, Store, Receipt, CheckCircle, Save, Trash2, Upload, X, FileSpreadsheet, Download, UploadCloud, CheckCircle2, Smartphone, RefreshCw, QrCode, FileJson } from 'lucide-react';
+import { Settings, Store, Receipt, CheckCircle, Save, Trash2, Upload, X, FileSpreadsheet, Download, UploadCloud, CheckCircle2, FileJson, Image as ImageIcon, QrCode } from 'lucide-react';
+
+// Client-side image compressor for lightweight, fast 0ms storage in MongoDB
+const processAndCompressImage = (file: File, maxWidth = 600, maxHeight = 600): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(reader.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.90));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
 
 export const SettingsPage: React.FC = () => {
   const { showToast } = useToast();
   const [setting, setSetting] = useState<Setting>({
-    shopName: 'IntelligentLaundry',
-    shopTagline: 'Smart & Premium Laundry Management',
-    logoUrl: '/Intelligent Laundry.jpg.jpeg',
+    shopName: 'Miracle Laundry',
+    shopTagline: 'Laundry & Dry Cleaning Live Studio',
+    logoUrl: '/logo.jpg',
     phone: '+91 98765 43210',
-    email: 'contact@intelligentlaundry.com',
+    email: 'contact@miraclelaundry.com',
     address: '123 Sparkle Avenue, Suite 4B, Commercial Hub',
     gstNumber: '27AABCU9603R1ZM',
     gstPercentage: 18,
@@ -31,16 +67,8 @@ export const SettingsPage: React.FC = () => {
     termsAndConditions: 'Items not collected within 30 days are subject to storage charges.',
   });
 
-  const [activeTab, setActiveTab] = useState<'shop' | 'invoice' | 'whatsapp' | 'backup'>('shop');
+  const [activeTab, setActiveTab] = useState<'shop' | 'invoice' | 'backup'>('shop');
   const [isSaved, setIsSaved] = useState(false);
-
-  // WhatsApp Automation Gateway State
-  const [waStatus, setWaStatus] = useState<{ connected: boolean; qrCode: string | null; phone: string | null }>({
-    connected: false,
-    qrCode: null,
-    phone: null,
-  });
-  const [waLoading, setWaLoading] = useState(false);
 
   // Backup & Restore state
   const [isExporting, setIsExporting] = useState(false);
@@ -88,62 +116,32 @@ export const SettingsPage: React.FC = () => {
     load();
   }, []);
 
-  useEffect(() => {
-    let interval: any;
-    const checkWa = async () => {
-      const res = await fetchWhatsAppStatus();
-      if (res && res.success) {
-        setWaStatus({
-          connected: res.connected,
-          qrCode: res.qrCode,
-          phone: res.phone,
-        });
-      }
-    };
+  const [isSaving, setIsSaving] = useState(false);
 
-    checkWa();
-    if (activeTab === 'whatsapp') {
-      interval = setInterval(checkWa, 3000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [activeTab]);
-
-  const handleDisconnectWhatsApp = async () => {
-    if (!confirm('Are you sure you want to disconnect WhatsApp Gateway?')) return;
-    setWaLoading(true);
-    try {
-      await disconnectWhatsAppApi();
-      const res = await fetchWhatsAppStatus();
-      if (res && res.success) {
-        setWaStatus({
-          connected: res.connected,
-          qrCode: res.qrCode,
-          phone: res.phone,
-        });
-      }
-    } catch (err: any) {
-      alert('Failed to disconnect WhatsApp');
-    } finally {
-      setWaLoading(false);
-    }
-  };
-
-  const handleSaveShopSettings = async (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent, source: 'shop' | 'invoice') => {
     e.preventDefault();
+    setIsSaving(true);
     try {
       const res = await updateSettingsApi(setting);
-      if (res.success) {
+      if (res && res.success) {
         if (res.setting) {
           setSetting(res.setting);
         }
         setIsSaved(true);
-        showToast('✅ Shop & Invoice settings saved successfully!', 'success');
+        showToast(
+          source === 'shop'
+            ? '✅ Shop profile updated successfully!'
+            : '✅ Invoice preferences & QR code updated successfully!',
+          'success'
+        );
         setTimeout(() => setIsSaved(false), 3000);
+      } else {
+        throw new Error(res?.message || 'Failed to update settings');
       }
     } catch (err: any) {
       showToast(err.message || 'Failed to update settings', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -231,20 +229,6 @@ export const SettingsPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('whatsapp')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-            activeTab === 'whatsapp'
-              ? 'bg-emerald-600 text-white shadow-md'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Smartphone className="w-4 h-4 text-emerald-500" /> WhatsApp Auto
-          {waStatus.connected && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
-          )}
-        </button>
-
-        <button
           onClick={() => setActiveTab('backup')}
           className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
             activeTab === 'backup'
@@ -265,10 +249,15 @@ export const SettingsPage: React.FC = () => {
 
       {/* Shop Profile Tab */}
       {activeTab === 'shop' && (
-        <form onSubmit={handleSaveShopSettings} className="glass-card p-6 space-y-4">
-          <h3 className="font-extrabold text-sm text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
-            Store Identity Details
-          </h3>
+        <form onSubmit={(e) => handleSaveSettings(e, 'shop')} className="glass-card p-6 space-y-4">
+          <div className="border-b border-slate-100 dark:border-slate-800 pb-2">
+            <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+              Store Identity & Contact Details
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              These details represent your laundry business across the POS, customer bills, and online store.
+            </p>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -280,7 +269,7 @@ export const SettingsPage: React.FC = () => {
                 required
                 value={setting.shopName}
                 onChange={(e) => setSetting({ ...setting, shopName: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-brand-500 font-bold"
               />
             </div>
 
@@ -290,9 +279,9 @@ export const SettingsPage: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={setting.shopTagline}
+                value={setting.shopTagline || ''}
                 onChange={(e) => setSetting({ ...setting, shopTagline: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-brand-500"
               />
             </div>
           </div>
@@ -307,7 +296,7 @@ export const SettingsPage: React.FC = () => {
                 required
                 value={setting.phone}
                 onChange={(e) => setSetting({ ...setting, phone: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-brand-500 font-semibold"
               />
             </div>
 
@@ -320,7 +309,7 @@ export const SettingsPage: React.FC = () => {
                 required
                 value={setting.email}
                 onChange={(e) => setSetting({ ...setting, email: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-brand-500"
               />
             </div>
           </div>
@@ -334,28 +323,75 @@ export const SettingsPage: React.FC = () => {
               required
               value={setting.address}
               onChange={(e) => setSetting({ ...setting, address: e.target.value })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-brand-500"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Logo Image URL
+          {/* Store Logo Section with Visual Preview & Upload */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Shop Brand Logo
             </label>
-            <input
-              type="text"
-              value={setting.logoUrl}
-              onChange={(e) => setSetting({ ...setting, logoUrl: e.target.value })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
-            />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              <div className="w-20 h-20 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm shrink-0 flex items-center justify-center overflow-hidden">
+                <img
+                  src={setting.logoUrl || '/logo.jpg'}
+                  alt="Shop Logo"
+                  className="w-full h-full object-contain rounded-xl"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/logo.jpg';
+                  }}
+                />
+              </div>
+
+              <div className="flex-1 space-y-2 w-full">
+                <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                  This logo appears in the app navigation, login screen, digital receipts, and printable bills.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold cursor-pointer inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Logo Image</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const compressed = await processAndCompressImage(file, 400, 400);
+                            setSetting({ ...setting, logoUrl: compressed });
+                            showToast('Logo image loaded! Click Save to apply.', 'info');
+                          } catch (err) {
+                            showToast('Failed to read image', 'error');
+                          }
+                        }
+                      }}
+                    />
+                  </label>
+
+                  <span className="text-xs text-slate-400 font-bold">OR</span>
+
+                  <input
+                    type="text"
+                    placeholder="Enter image URL (/logo.jpg or web link)..."
+                    value={setting.logoUrl || ''}
+                    onChange={(e) => setSetting({ ...setting, logoUrl: e.target.value })}
+                    className="flex-1 min-w-[200px] px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none font-mono"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="pt-3 flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md flex items-center gap-2"
+              disabled={isSaving}
+              className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
             >
-              <Save className="w-4 h-4" /> Save Shop Profile
+              <Save className="w-4 h-4" /> {isSaving ? 'Saving...' : 'Save Shop Profile'}
             </button>
 
             <button
@@ -371,12 +407,17 @@ export const SettingsPage: React.FC = () => {
 
       {/* Invoice & Tax Settings */}
       {activeTab === 'invoice' && (
-        <form onSubmit={handleSaveShopSettings} className="glass-card p-6 space-y-4">
-          <h3 className="font-extrabold text-sm text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2">
-            Invoice & Tax Preferences
-          </h3>
+        <form onSubmit={(e) => handleSaveSettings(e, 'invoice')} className="glass-card p-6 space-y-5">
+          <div className="border-b border-slate-100 dark:border-slate-800 pb-2">
+            <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+              Invoice Formatting & Billing Rules
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Configure bill numbering, GST tax calculations, payment QR codes, and printed terms.
+            </p>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Currency Symbol
@@ -386,7 +427,7 @@ export const SettingsPage: React.FC = () => {
                 value={setting.currencySymbol}
                 onChange={(e) => setSetting({ ...setting, currencySymbol: e.target.value })}
                 placeholder="₹ or $"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-bold"
               />
             </div>
 
@@ -399,13 +440,13 @@ export const SettingsPage: React.FC = () => {
                 value={setting.invoicePrefix}
                 onChange={(e) => setSetting({ ...setting, invoicePrefix: e.target.value })}
                 placeholder="ORD- or INV-"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono font-bold"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                GST / Tax Percentage (%)
+                GST / Tax Rate (%)
               </label>
               <input
                 type="number"
@@ -413,103 +454,137 @@ export const SettingsPage: React.FC = () => {
                 max="100"
                 value={setting.gstPercentage}
                 onChange={(e) => setSetting({ ...setting, gstPercentage: Number(e.target.value) })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              GSTIN / Tax Number (Optional)
-            </label>
-            <input
-              type="text"
-              value={setting.gstNumber}
-              onChange={(e) => setSetting({ ...setting, gstNumber: e.target.value })}
-              placeholder="e.g. 27AAAAA0000A1Z5"
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                GPay / PhonePe Mobile Number
-              </label>
-              <input
-                type="text"
-                value={setting.gpayNumber || ''}
-                onChange={(e) => setSetting({ ...setting, gpayNumber: e.target.value })}
-                placeholder="e.g. 9876543210"
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-bold"
               />
-              <p className="text-[10px] text-slate-400 mt-1">Displayed on customer invoice for GPay / PhonePe transfers.</p>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Shop UPI ID / VPA Address
+                GSTIN / Tax ID (Optional)
               </label>
               <input
                 type="text"
-                value={setting.upiId || ''}
-                onChange={(e) => setSetting({ ...setting, upiId: e.target.value })}
-                placeholder="e.g. 9876543210@paytm or shopname@okicici"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-bold text-brand-600"
+                value={setting.gstNumber || ''}
+                onChange={(e) => setSetting({ ...setting, gstNumber: e.target.value })}
+                placeholder="e.g. 27AAAAA0000A1Z5"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-mono"
               />
-              <p className="text-[10px] text-slate-400 mt-1">Generates instant UPI scan & pay QR code on invoice receipts.</p>
             </div>
           </div>
 
-          {/* Custom Payment QR Image Upload Section */}
-          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Custom Payment QR Code Image (GPay / PhonePe Standee Image)
-            </label>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-              {setting.paymentQrUrl ? (
-                <div className="relative group shrink-0">
-                  <img
-                    src={setting.paymentQrUrl}
-                    alt="Custom Payment QR"
-                    className="w-24 h-24 object-contain rounded-xl border border-slate-300 bg-white p-1 shadow-xs"
-                  />
+          {/* Payment & Scan-to-Pay QR Code Setup */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+            <div>
+              <h4 className="font-extrabold text-xs uppercase tracking-wider text-brand-700 dark:text-brand-400 flex items-center gap-1.5">
+                <QrCode className="w-4 h-4" /> Customer Invoice Scan & Pay QR Code
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Choose how customers pay you on bills: upload your official shop GPay/PhonePe standee QR, or enter your UPI ID for an automatic QR code.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Shop UPI ID / VPA
+                </label>
+                <input
+                  type="text"
+                  value={setting.upiId || ''}
+                  onChange={(e) => setSetting({ ...setting, upiId: e.target.value })}
+                  placeholder="e.g. miraclelaundry@okaxis or 9876543210@paytm"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-bold text-brand-600"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Used to generate dynamic scan-and-pay UPI QR code.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Payment Mobile (GPay / PhonePe)
+                </label>
+                <input
+                  type="text"
+                  value={setting.gpayNumber || ''}
+                  onChange={(e) => setSetting({ ...setting, gpayNumber: e.target.value })}
+                  placeholder={setting.phone ? `Defaults to Store Phone (${setting.phone})` : 'e.g. 9876543210'}
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none font-semibold"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Printed on bill for GPay/PhonePe number transfers (optional).</p>
+              </div>
+            </div>
+
+            {/* QR Code Upload & Live Preview Card */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              {/* QR Preview Display */}
+              <div className="relative shrink-0 flex flex-col items-center">
+                <div className="w-28 h-28 bg-white dark:bg-slate-900 p-2 rounded-2xl border border-slate-300 dark:border-slate-700 shadow-xs flex items-center justify-center overflow-hidden">
+                  {setting.paymentQrUrl ? (
+                    <img
+                      src={setting.paymentQrUrl}
+                      alt="Custom Payment QR Standee"
+                      className="w-full h-full object-contain rounded-xl"
+                    />
+                  ) : (
+                    <QRCodeSVG
+                      value={`upi://pay?pa=${encodeURIComponent(setting.upiId || 'miraclelaundry@okaxis')}&pn=${encodeURIComponent(setting.shopName || 'Miracle Laundry')}&cu=INR`}
+                      size={96}
+                      level="M"
+                      includeMargin={false}
+                    />
+                  )}
+                </div>
+
+                {setting.paymentQrUrl ? (
                   <button
                     type="button"
-                    onClick={() => setSetting({ ...setting, paymentQrUrl: '' })}
-                    className="absolute -top-2 -right-2 p-1 rounded-full bg-rose-600 text-white shadow-md hover:bg-rose-700 transition-all"
-                    title="Remove custom QR image"
+                    onClick={() => {
+                      setSetting({ ...setting, paymentQrUrl: '' });
+                      showToast('Custom QR removed. Switched to Dynamic UPI QR.', 'info');
+                    }}
+                    className="mt-1.5 text-[10px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-3 h-3" /> Remove Custom QR
                   </button>
-                </div>
-              ) : (
-                <div className="w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center text-slate-400 text-center p-2 bg-white dark:bg-slate-800 shrink-0">
-                  <Upload className="w-6 h-6 mb-1 text-slate-400" />
-                  <span className="text-[10px] font-bold">No Custom QR</span>
-                </div>
-              )}
+                ) : (
+                  <span className="mt-1.5 text-[10px] font-bold text-brand-600 dark:text-brand-400">
+                    Auto-generated UPI QR
+                  </span>
+                )}
+              </div>
 
+              {/* Upload Controls */}
               <div className="flex-1 space-y-2 w-full">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>
+                    {setting.paymentQrUrl
+                      ? 'Live on Bills: Uploaded Custom Standee QR Image'
+                      : 'Live on Bills: Automatic UPI QR (from your UPI ID)'}
+                  </span>
+                </div>
+
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                  Upload your shop's official GPay / PhonePe / Paytm standee QR image to show directly on customer invoices.
+                  Upload an image of your store's printed GPay / PhonePe / BharatPe standee to display it verbatim on customer invoices.
                 </p>
-                <div className="flex flex-wrap items-center gap-2">
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
                   <label className="px-3.5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-extrabold cursor-pointer inline-flex items-center gap-1.5 shadow-xs transition-all active:scale-95">
                     <Upload className="w-3.5 h-3.5" />
-                    <span>Upload QR Image</span>
+                    <span>Upload Standee QR Image</span>
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setSetting({ ...setting, paymentQrUrl: reader.result as string });
-                          };
-                          reader.readAsDataURL(file);
+                          try {
+                            const compressed = await processAndCompressImage(file, 500, 500);
+                            setSetting({ ...setting, paymentQrUrl: compressed });
+                            showToast('Standee QR loaded! Click Save Invoice Settings below.', 'info');
+                          } catch (err) {
+                            showToast('Failed to process image', 'error');
+                          }
                         }
                       }}
                     />
@@ -529,124 +604,33 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Receipt Terms & Conditions
+          {/* Receipt Terms & Conditions */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Receipt & Invoice Terms & Conditions
             </label>
+            <p className="text-[11px] text-slate-500">
+              These terms appear at the bottom of printed and digital customer receipts. Each new line will be printed as a separate term.
+            </p>
             <textarea
               rows={4}
-              value={setting.termsAndConditions}
+              value={setting.termsAndConditions || ''}
               onChange={(e) => setSetting({ ...setting, termsAndConditions: e.target.value })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none leading-relaxed"
+              placeholder="1. Please check garments at the time of delivery.&#10;2. Clothes uncollected after 30 days are subject to storage charges."
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none leading-relaxed focus:border-brand-500 font-medium"
             />
           </div>
 
-          <div className="pt-3">
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md flex items-center gap-2"
+              disabled={isSaving}
+              className="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold shadow-md flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
             >
-              <Save className="w-4 h-4" /> Save Invoice Config
+              <Save className="w-4 h-4" /> {isSaving ? 'Saving...' : 'Save Invoice Settings'}
             </button>
           </div>
         </form>
-      )}
-
-      {/* TAB 3: WHATSAPP AUTOMATION GATEWAY */}
-      {activeTab === 'whatsapp' && (
-        <div className="glass-card p-5 sm:p-8 space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
-            <div>
-              <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-emerald-500" /> WhatsApp Automation Gateway
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Automatically send WhatsApp receipts on order creation & delivery in the background (100% Free)
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
-                  waStatus.connected
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                }`}
-              >
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    waStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                  }`}
-                />
-                {waStatus.connected ? 'Connected' : 'QR Scan Required'}
-              </span>
-            </div>
-          </div>
-
-          {waStatus.connected ? (
-            <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <span className="text-xs font-extrabold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
-                    Linked Shop Phone Number
-                  </span>
-                  <p className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-                    📱 +{waStatus.phone}
-                  </p>
-                </div>
-                <button
-                  onClick={handleDisconnectWhatsApp}
-                  disabled={waLoading}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs active:scale-95 transition-all"
-                >
-                  {waLoading ? 'Disconnecting...' : 'Disconnect / Relink Phone'}
-                </button>
-              </div>
-
-              <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-emerald-100 dark:border-emerald-900 text-xs text-slate-600 dark:text-slate-300 space-y-2">
-                <p className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4" /> 100% Background Automation Enabled!
-                </p>
-                <ul className="list-disc pl-5 space-y-1 text-slate-500 dark:text-slate-400">
-                  <li>When you create a new order → customer receives WhatsApp receipt link automatically in background!</li>
-                  <li>When order status is set to Delivered → customer receives delivery confirmation & tax invoice link automatically in background!</li>
-                  <li>Zero manual WhatsApp opening or clicking required.</li>
-                </ul>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col md:flex-row items-center gap-8 bg-slate-50 dark:bg-slate-800/40 p-6 rounded-2xl border border-slate-200 dark:border-slate-800">
-              <div className="shrink-0 flex flex-col items-center space-y-3">
-                {waStatus.qrCode ? (
-                  <div className="bg-white p-4 rounded-2xl shadow-lg border border-slate-200">
-                    <img src={waStatus.qrCode} alt="WhatsApp QR Code" className="w-56 h-56 object-contain" />
-                  </div>
-                ) : (
-                  <div className="w-56 h-56 bg-slate-200 dark:bg-slate-700 animate-pulse rounded-2xl flex items-center justify-center text-slate-400 font-bold text-xs">
-                    Generating QR Code...
-                  </div>
-                )}
-                <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-brand-600" /> Auto-refreshing QR code
-                </span>
-              </div>
-
-              <div className="space-y-4 flex-1">
-                <h4 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
-                  <QrCode className="w-4 h-4 text-emerald-600" /> Link your Shop WhatsApp (30 Seconds Setup)
-                </h4>
-                <ol className="list-decimal pl-5 space-y-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  <li>Open <strong>WhatsApp</strong> on your shop's mobile phone.</li>
-                  <li>Tap <strong>Menu (⋮)</strong> on Android or <strong>Settings (⚙️)</strong> on iPhone.</li>
-                  <li>Select <strong>Linked Devices</strong> → tap <strong>Link a Device</strong>.</li>
-                  <li>Point your phone camera at the QR code on the left to scan!</li>
-                </ol>
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900 text-xs text-amber-800 dark:text-amber-300">
-                  💡 Once scanned, your phone will stay permanently linked for automated zero-click background customer messaging.
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
       )}
 
       {/* Excel Backup & Restore Tab */}

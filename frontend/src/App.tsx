@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
+import { BranchProvider, useBranch } from './context/BranchContext';
 
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -23,6 +24,7 @@ import { LandingWebsitePage } from './pages/LandingWebsitePage';
 import { AccountsPage } from './pages/AccountsPage';
 import { StaffPage } from './pages/StaffPage';
 import { MachinePage } from './pages/MachinePage';
+import { DeveloperBranchSetupPage } from './pages/DeveloperBranchSetupPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -44,7 +46,7 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-semibold text-slate-400">Loading Intelligent Laundry POS...</p>
+          <p className="text-xs font-semibold text-slate-400">Loading Miracle Laundry POS...</p>
         </div>
       </div>
     );
@@ -74,6 +76,24 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   );
 };
 
+// Wrapper to activate Admin Mode (Multi-Branch Overview & Broadcast Tools)
+const AdminRouteWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { setIsAdminMode } = useBranch();
+  React.useEffect(() => {
+    setIsAdminMode(true);
+  }, [setIsAdminMode]);
+  return <>{children}</>;
+};
+
+// Wrapper to ensure Single-Branch POS Mode (Hides Multi-Branch Switcher)
+const BranchRouteWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { setIsAdminMode } = useBranch();
+  React.useEffect(() => {
+    setIsAdminMode(false);
+  }, [setIsAdminMode]);
+  return <>{children}</>;
+};
+
 export const AppContent: React.FC = () => {
   return (
     <Routes>
@@ -83,11 +103,36 @@ export const AppContent: React.FC = () => {
       <Route path="/receipt" element={<PublicReceiptPage />} />
       <Route path="/index.html" element={<PublicReceiptPage />} />
 
+      {/* Local Store Branch Access Link (Single Store POS) */}
       <Route
         path="/dashboard"
         element={
           <ProtectedLayout>
-            <DashboardPage />
+            <BranchRouteWrapper>
+              <DashboardPage />
+            </BranchRouteWrapper>
+          </ProtectedLayout>
+        }
+      />
+
+      {/* Central Admin Access Links (Multi-Branch Chain Overview & Branch Switcher) */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedLayout>
+            <AdminRouteWrapper>
+              <DashboardPage />
+            </AdminRouteWrapper>
+          </ProtectedLayout>
+        }
+      />
+      <Route
+        path="/admin/dashboard"
+        element={
+          <ProtectedLayout>
+            <AdminRouteWrapper>
+              <DashboardPage />
+            </AdminRouteWrapper>
           </ProtectedLayout>
         }
       />
@@ -191,6 +236,23 @@ export const AppContent: React.FC = () => {
         }
       />
 
+      {/* Client Multi-Branch Admin Portal Link Aliases (Redirect to /admin) */}
+      <Route path="/admin-portal" element={<Navigate to="/admin" replace />} />
+      <Route path="/hq" element={<Navigate to="/admin" replace />} />
+      <Route path="/master-admin" element={<Navigate to="/admin" replace />} />
+      <Route path="/super-admin" element={<Navigate to="/admin" replace />} />
+
+      {/* Secret Developer Branch Infrastructure & Render Setup Page (Direct Link Only) */}
+      <Route
+        path="/admin/network-setup"
+        element={
+          <ProtectedLayout>
+            <DeveloperBranchSetupPage />
+          </ProtectedLayout>
+        }
+      />
+      <Route path="/dev-branches" element={<Navigate to="/admin/network-setup" replace />} />
+
       <Route path="/" element={<LandingWebsitePage />} />
       <Route path="/website" element={<LandingWebsitePage />} />
       <Route
@@ -209,11 +271,13 @@ export const App: React.FC = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ToastProvider>
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-        </ToastProvider>
+        <BranchProvider>
+          <ToastProvider>
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </ToastProvider>
+        </BranchProvider>
       </AuthProvider>
     </ThemeProvider>
   );

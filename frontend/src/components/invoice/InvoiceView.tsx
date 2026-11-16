@@ -2,11 +2,10 @@ import React, { useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { sendOrderWhatsAppPdfApi } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { Order, Setting } from '../../types';
 import { StatusBadge } from '../ui/Badge';
-import { Printer, Smartphone, X, CheckCircle, Sparkles, Phone, Mail, MapPin, FileText, Send } from 'lucide-react';
+import { Printer, Smartphone, X, CheckCircle, Sparkles, Phone, Mail, MapPin, FileText, Send, QrCode } from 'lucide-react';
 
 interface InvoiceViewProps {
   order: Order;
@@ -23,7 +22,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
   // UPI Payment Details & QR Code Generator
   const shopUpiId = setting?.upiId || '9876543210@paytm';
   const shopGPayPhone = setting?.gpayNumber || setting?.phone || '9876543210';
-  const shopName = setting?.shopName || 'IntelligentLaundry';
+  const shopName = setting?.shopName || 'Miracle Laundry';
   const dueAmount = order.remainingBalance > 0 ? order.remainingBalance : order.totalAmount;
   const upiPaymentUrl = `upi://pay?pa=${encodeURIComponent(shopUpiId)}&pn=${encodeURIComponent(shopName)}&am=${dueAmount}&cu=INR&tn=${encodeURIComponent('Order #' + order.orderNumber)}`;
 
@@ -98,24 +97,22 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
     }
   };
 
-  // Handle Smart WhatsApp Share targeted directly to customer phone number
-  const handleWhatsAppShare = async () => {
+  // Handle WhatsApp Share targeted directly to customer phone number via wa.me
+  const handleWhatsAppShare = () => {
     try {
-      const res = await sendOrderWhatsAppPdfApi(order._id);
-      if (res.success) {
-        showToast(`✅ PDF Invoice sent directly to +${order.customerSnapshot.mobile} via WhatsApp!`, 'success');
-      } else {
-        // Fallback to wa.me if gateway is not connected
-        const mobile = order.customerSnapshot.mobile.replace(/\D/g, '');
-        const phoneWithCountry = mobile.length === 10 ? '91' + mobile : mobile;
-        const receiptUrl = `${window.location.origin}/receipt/${order.orderNumber}?r=${order.orderNumber}`;
-        const text = `Hello *${order.customerSnapshot.name}*,\n\nYour official laundry invoice & receipt for Order *#${order.orderNumber}* is ready!\n\n🔗 *View & Print Invoice*:\n${receiptUrl}`;
-        const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(text)}`;
-        window.open(url, '_blank');
-        showToast(res.message || 'WhatsApp Gateway disconnected. Opened WhatsApp Web fallback.', 'info');
+      const rawMobile = order.customerSnapshot?.mobile || '';
+      const mobile = rawMobile.replace(/\D/g, '');
+      if (!mobile) {
+        showToast('No customer mobile number found for this order', 'error');
+        return;
       }
+      const phoneWithCountry = mobile.length === 10 ? '91' + mobile : mobile;
+      const receiptUrl = `${window.location.origin}/receipt/${order.orderNumber}?r=${order.orderNumber}`;
+      const text = `Hello *${order.customerSnapshot?.name || 'Customer'}*,\n\nYour official laundry invoice & receipt for Order *#${order.orderNumber}* is ready!\n\n🔗 *View & Print Invoice*:\n${receiptUrl}`;
+      const url = `https://wa.me/${phoneWithCountry}?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank');
     } catch (err: any) {
-      showToast(err.message || 'Failed to send WhatsApp message', 'error');
+      showToast(err.message || 'Failed to open WhatsApp', 'error');
     }
   };
 
@@ -197,17 +194,15 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
                       ? setting.logoUrl
                       : "/logo.jpg"
                   }
-                  alt="IntelligentLaundry Logo"
+                  alt="Miracle Laundry Logo"
                   className="h-10 sm:h-12 w-auto object-contain rounded-xl border border-slate-200 shadow-xs"
                 />
                 <span className="text-brand-700 font-black tracking-tight">
-                  {setting?.shopName && setting.shopName !== 'IntelligentLaundry & Dry Cleaners'
-                    ? setting.shopName
-                    : 'Intelligent Laundry'}
+                  {setting?.shopName || 'Miracle Laundry'}
                 </span>
               </div>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                {setting?.shopTagline || 'Smart & Premium Laundry Management'}
+                {setting?.shopTagline || 'Laundry & Dry Cleaning Live Studio'}
               </p>
 
               <div className="mt-2.5 text-xs text-slate-600 space-y-1">
@@ -220,7 +215,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
                   <span>{setting?.phone || '+91 98765 43210'}</span>
                   <span className="text-slate-300">•</span>
                   <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span className="break-all">{setting?.email || 'contact@intelligentlaundry.com'}</span>
+                  <span className="break-all">{setting?.email || 'contact@miraclelaundry.com'}</span>
                 </p>
                 {setting?.gstNumber && (
                   <p className="text-[11px] font-bold text-slate-700 pt-0.5">
@@ -331,10 +326,56 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
             </div>
           </div>
 
-          {/* Calculation Breakdown */}
-          <div className="border-t border-slate-200 pt-5 flex justify-end">
-            {/* Calculations Breakdown */}
-            <div className="w-full sm:w-64 text-xs space-y-2">
+          {/* Payment QR & Calculation Breakdown */}
+          <div className="border-t border-slate-200 pt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+            {/* Left: Payment QR Code & UPI Transfer Info */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center gap-3.5">
+              {/* QR Code Container */}
+              <div className="w-24 h-24 sm:w-28 sm:h-28 bg-white p-1.5 rounded-xl border border-slate-200 shadow-xs shrink-0 flex items-center justify-center overflow-hidden">
+                {setting?.paymentQrUrl ? (
+                  <img
+                    src={setting.paymentQrUrl}
+                    alt="Payment QR Code"
+                    className="w-full h-full object-contain rounded-lg"
+                  />
+                ) : (
+                  <QRCodeSVG
+                    value={upiPaymentUrl}
+                    size={100}
+                    level="M"
+                    includeMargin={false}
+                    className="w-full h-full"
+                  />
+                )}
+              </div>
+
+              {/* Payment Text / Info */}
+              <div className="space-y-1 text-xs text-slate-700 min-w-0">
+                <div className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-brand-700">
+                  <QrCode className="w-3.5 h-3.5" />
+                  <span>Scan & Pay Due</span>
+                </div>
+                <p className="text-[11px] font-bold text-slate-900">
+                  {dueAmount > 0 ? `Pay: ${currencySymbol}${dueAmount}` : 'Payment Completed'}
+                </p>
+                {setting?.upiId && (
+                  <p className="text-[10px] text-slate-600 truncate">
+                    <span className="text-slate-400 font-medium">UPI:</span> <strong className="font-mono">{setting.upiId}</strong>
+                  </p>
+                )}
+                {shopGPayPhone && (
+                  <p className="text-[10px] text-slate-600 truncate">
+                    <span className="text-slate-400 font-medium">GPay/PhonePe:</span> <strong className="font-mono">{shopGPayPhone}</strong>
+                  </p>
+                )}
+                <p className="text-[9px] text-slate-400 leading-tight">
+                  Scan via GPay, PhonePe, Paytm or any UPI App
+                </p>
+              </div>
+            </div>
+
+            {/* Right: Calculations Breakdown */}
+            <div className="w-full text-xs space-y-2 sm:pl-2">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal:</span>
                 <span className="font-bold text-slate-800">{currencySymbol}{order.subtotal}</span>
@@ -381,13 +422,19 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, setting, onClos
           {/* Footer Terms & Thank You */}
           <div className="mt-6 pt-4 border-t border-dashed border-slate-200 text-[10px] text-slate-500 text-center leading-relaxed">
             <p className="font-bold text-slate-800 mb-1.5 text-xs">
-              Thank you for choosing {setting?.shopName || 'IntelligentLaundry'}!
+              Thank you for choosing {setting?.shopName || 'Miracle Laundry'}!
             </p>
-            <div className="space-y-1 text-slate-600 font-semibold max-w-md mx-auto bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-left sm:text-center">
-              <p>1. Please inspect clothes upon delivery.</p>
-              <p>2. Clothes not collected within 30 days are subject to storage charges.</p>
-              <p>3. Colors may bleed on delicate items if not pre-informed.</p>
-            </div>
+            {setting?.termsAndConditions ? (
+              <div className="whitespace-pre-line text-slate-600 font-semibold max-w-lg mx-auto bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-left sm:text-center text-[10px] leading-relaxed">
+                {setting.termsAndConditions}
+              </div>
+            ) : (
+              <div className="space-y-1 text-slate-600 font-semibold max-w-md mx-auto bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 text-left sm:text-center">
+                <p>1. Please inspect clothes upon delivery.</p>
+                <p>2. Clothes not collected within 30 days are subject to storage charges.</p>
+                <p>3. Colors may bleed on delicate items if not pre-informed.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

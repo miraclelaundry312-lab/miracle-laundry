@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useBranch } from '../../context/BranchContext';
 import { PwaInstallButton } from '../common/PwaInstallButton';
 import {
   Sun,
@@ -15,6 +16,7 @@ import {
   Clock,
   PanelLeftClose,
   PanelLeftOpen,
+  Building2,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -25,6 +27,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSidebar }) => {
   const { admin, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { branches, selectedBranchId, setSelectedBranchId, isAdminMode } = useBranch();
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -61,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
             <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover rounded-md" />
           </div>
           <span className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1">
-            Intelligent Laundry <Sparkles className="w-3 h-3 text-brand-500 fill-brand-500" />
+            Miracle Laundry <Sparkles className="w-3 h-3 text-brand-500 fill-brand-500" />
           </span>
         </div>
 
@@ -88,8 +91,35 @@ export const Header: React.FC<HeaderProps> = ({ isSidebarCollapsed, onToggleSide
         </div>
       </div>
 
-      {/* Right Actions */}
+      {/* Right Actions & Multi-Branch Dropdown */}
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Branch Selector Dropdown - Only visible on Admin Access Link */}
+        {isAdminMode && (
+          <div className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-2xl py-1 px-2.5 sm:px-3 shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <select
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              className="bg-transparent text-xs font-black text-slate-800 dark:text-slate-100 outline-none cursor-pointer max-w-[130px] sm:max-w-[200px] truncate"
+              title="Select Branch"
+            >
+              <option value="all" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold">
+                🌐 All Branches (Combined)
+              </option>
+              {branches.map((b) => (
+                <option
+                  key={b._id}
+                  value={b._id}
+                  className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-bold"
+                >
+                  🏢 {b.name} {b.isSelf ? '(HQ)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* PWA Desktop App Installation Button */}
         <PwaInstallButton className="hidden md:flex" />
 

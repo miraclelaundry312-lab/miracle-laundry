@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useBranch } from '../../context/BranchContext';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -25,6 +26,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggleCollapse }) => {
   const location = useLocation();
+  const { isAdminMode } = useBranch();
 
   // Check if current path belongs to Catalog & Services group
   const isCatalogRoute = ['/services', '/items', '/categories'].includes(location.pathname);
@@ -37,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggleC
   }, [location.pathname]);
 
   const mainNavItems = [
-    { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { label: isAdminMode ? 'Chain Dashboard' : 'Dashboard', path: isAdminMode ? '/admin' : '/dashboard', icon: LayoutDashboard },
     { label: 'New Order', path: '/orders/new', icon: PlusCircle },
     { label: 'Orders', path: '/orders', icon: ShoppingBag, end: true },
     { label: 'Staff & Attendance', path: '/staff', icon: Users },
@@ -72,9 +74,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggleC
           {!isCollapsed && (
             <div className="truncate">
               <h1 className="font-bold text-sm tracking-tight text-slate-900 dark:text-white flex items-center gap-1">
-                Intelligent Laundry <Sparkles className="w-3 h-3 text-brand-500 fill-brand-500 shrink-0" />
+                Miracle Laundry <Sparkles className="w-3 h-3 text-brand-500 fill-brand-500 shrink-0" />
               </h1>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Laundry Admin POS</p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                {isAdminMode ? '👑 Multi-Branch Admin' : 'Laundry Branch POS'}
+              </p>
             </div>
           )}
         </div>
@@ -236,7 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed = false, onToggleC
       {/* Footer Info */}
       {!isCollapsed && (
         <div className="p-3 m-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400">
-          <p className="font-semibold text-slate-700 dark:text-slate-300">Intelligent Laundry v1.0</p>
+          <p className="font-semibold text-slate-700 dark:text-slate-300">Miracle Laundry v1.0</p>
           <p className="mt-0.5 text-[11px]">Express Laundry POS</p>
         </div>
       )}

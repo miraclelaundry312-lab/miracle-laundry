@@ -1,4 +1,4 @@
-# 🧺 IntelligentLaundry - Laundry Shop Management System
+# 🧺 MiracleLaundry - Laundry Shop Management System
 
 A modern, production-ready, **Mobile-First** Laundry Shop Management Web Application designed for small laundry & dry cleaning business owners to streamline daily shop operations, order tracking, payment recording, customer history, and digital/printable receipts with QR codes.
 

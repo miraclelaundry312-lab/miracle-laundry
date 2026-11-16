@@ -1,4 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
+import path from 'path';
+import fs from 'fs';
 import cors from 'cors';
 import compression from 'compression';
 import dotenv from 'dotenv';
@@ -18,10 +20,10 @@ import settingRoutes from './routes/settingRoutes';
 import expenseRoutes from './routes/expenseRoutes';
 import categoryRoutes from './routes/categoryRoutes';
 import backupRoutes from './routes/backupRoutes';
-import whatsappRoutes from './routes/whatsappRoutes';
 import staffRoutes from './routes/staffRoutes';
 import machineRoutes from './routes/machineRoutes';
-import { initWhatsAppGateway } from './services/whatsappGateway';
+import branchRoutes from './routes/branchRoutes';
+import masterAdminRoutes from './routes/masterAdminRoutes';
 
 dotenv.config();
 
@@ -35,8 +37,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma', 'X-Requested-With', 'Accept'],
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Base API health check with process.uptime() stats
 app.get('/api/health', (req: Request, res: Response) => {
@@ -45,7 +47,7 @@ app.get('/api/health', (req: Request, res: Response) => {
     dbConnected: mongoose.connection.readyState === 1,
     uptimeSeconds: Math.floor(process.uptime()),
     uptimeFormatted: `${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m ${Math.floor(process.uptime() % 60)}s`,
-    message: 'Intelligent Laundry API Server is running smoothly',
+    message: 'Miracle Laundry API Server is running smoothly',
     timestamp: new Date().toISOString(),
   });
 });
@@ -73,9 +75,10 @@ app.use('/api/settings', settingRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/garment-categories', categoryRoutes);
 app.use('/api/backup', backupRoutes);
-app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/machines', machineRoutes);
+app.use('/api/branch', branchRoutes);
+app.use('/api/master-admin', masterAdminRoutes);
 
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -86,13 +89,37 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-// 404 Route Handler
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    message: `API Route ${req.originalUrl} not found`,
+// Static Frontend Serving & 404 Fallback
+const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+const altFrontendDistPath = path.resolve(__dirname, '../frontend/dist');
+const resolvedDistPath = fs.existsSync(frontendDistPath)
+  ? frontendDistPath
+  : fs.existsSync(altFrontendDistPath)
+  ? altFrontendDistPath
+  : null;
+
+if (resolvedDistPath) {
+  console.log(`[STATIC] Serving production frontend build from: ${resolvedDistPath}`);
+  app.use(express.static(resolvedDistPath));
+
+  app.get('*', (req: Request, res: Response) => {
+    if (req.originalUrl.startsWith('/api')) {
+      return res.status(404).json({
+        success: false,
+        message: `API Route ${req.originalUrl} not found`,
+      });
+    }
+    res.sendFile(path.join(resolvedDistPath, 'index.html'));
   });
-});
+} else {
+  // 404 Handler for API-only deployment
+  app.use((req: Request, res: Response) => {
+    res.status(404).json({
+      success: false,
+      message: `API Route ${req.originalUrl} not found`,
+    });
+  });
+}
 
 // Uptime Keep-Alive Worker (Prevents Render Free Tier from going to sleep)
 const startUptimeKeepAlive = () => {
@@ -120,10 +147,9 @@ const startServer = async () => {
     if (isDBConnected) {
       await seedDatabase();
     }
-    initWhatsAppGateway();
     app.listen(PORT, () => {
       console.log(`====================================================`);
-      console.log(` 🧺 INTELLIGENT LAUNDRY SHOP BACKEND IS RUNNING!`);
+      console.log(` 🧺 MIRACLE LAUNDRY SHOP BACKEND IS RUNNING!`);
       console.log(` 🚀 Listening on: http://localhost:${PORT}`);
       console.log(` 📡 Health Check: http://localhost:${PORT}/api/health`);
       console.log(`====================================================`);

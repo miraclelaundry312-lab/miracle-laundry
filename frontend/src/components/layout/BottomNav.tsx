@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useBranch } from '../../context/BranchContext';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -15,6 +16,7 @@ import {
 
 export const BottomNav: React.FC = () => {
   const [showMoreMenu, setShowMoreMenu] = React.useState(false);
+  const { isAdminMode } = useBranch();
 
   return (
     <>
@@ -171,7 +173,7 @@ export const BottomNav: React.FC = () => {
       {/* Fixed Bottom Nav Bar */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 h-16 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-around z-30 px-2 shadow-lg">
         <NavLink
-          to="/dashboard"
+          to={isAdminMode ? '/admin' : '/dashboard'}
           onClick={() => setShowMoreMenu(false)}
           className={({ isActive }) =>
             `flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-colors ${

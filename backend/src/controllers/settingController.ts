@@ -43,17 +43,17 @@ export const updateSettings = async (req: Request, res: Response) => {
       paymentQrUrl,
     } = req.body;
 
-    if (shopName) setting.shopName = shopName;
+    if (shopName !== undefined) setting.shopName = shopName;
     if (shopTagline !== undefined) setting.shopTagline = shopTagline;
     if (logoUrl !== undefined) setting.logoUrl = logoUrl;
-    if (phone) setting.phone = phone;
-    if (email) setting.email = email;
-    if (address) setting.address = address;
+    if (phone !== undefined) setting.phone = phone;
+    if (email !== undefined) setting.email = email;
+    if (address !== undefined) setting.address = address;
     if (gstNumber !== undefined) setting.gstNumber = gstNumber;
-    if (gstPercentage !== undefined) setting.gstPercentage = Number(gstPercentage);
-    if (currencySymbol) setting.currencySymbol = currencySymbol;
-    if (currencyCode) setting.currencyCode = currencyCode;
-    if (invoicePrefix) setting.invoicePrefix = invoicePrefix;
+    if (gstPercentage !== undefined) setting.gstPercentage = Number(gstPercentage) || 0;
+    if (currencySymbol !== undefined) setting.currencySymbol = currencySymbol;
+    if (currencyCode !== undefined) setting.currencyCode = currencyCode;
+    if (invoicePrefix !== undefined) setting.invoicePrefix = invoicePrefix;
     if (termsAndConditions !== undefined) setting.termsAndConditions = termsAndConditions;
     if (upiId !== undefined) setting.upiId = upiId;
     if (gpayNumber !== undefined) setting.gpayNumber = gpayNumber;

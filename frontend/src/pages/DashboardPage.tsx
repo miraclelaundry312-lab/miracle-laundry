@@ -8,6 +8,9 @@ import {
   prefetchAllAppData,
 } from '../services/api';
 import { DashboardStats, Order, OrderStatus, Setting, Customer, Payment, MonthPendingGroup } from '../types';
+import { useBranch } from '../context/BranchContext';
+import { MasterChainDashboardView } from '../components/dashboard/MasterChainDashboardView';
+import { RemoteBranchDashboardView } from '../components/dashboard/RemoteBranchDashboardView';
 import { StatusBadge } from '../components/ui/Badge';
 import { OrderDetailModal } from '../components/orders/OrderDetailModal';
 import { InvoiceView } from '../components/invoice/InvoiceView';
@@ -46,6 +49,7 @@ import {
 type CardType = 'orders' | 'payments' | 'active' | 'customers' | 'overdue' | 'delivered_orders';
 
 export const DashboardPage: React.FC = () => {
+  const { selectedBranchId, setSelectedBranchId, selectedBranch, masterData, isAdminMode } = useBranch();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [setting, setSetting] = useState<Setting | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
@@ -209,7 +213,7 @@ export const DashboardPage: React.FC = () => {
   const handleWhatsAppShare = (ord: Order) => {
     const mobile = ord.customerSnapshot.mobile.replace(/\D/g, '');
     const receiptUrl = `${window.location.origin}/receipt/${ord.orderNumber}?r=${ord.orderNumber}`;
-    const text = `Hello *${ord.customerSnapshot.name}*,\n\nYour official laundry invoice & receipt for Order *#${ord.orderNumber}* from *${setting?.shopName || 'IntelligentLaundry'}* is ready!\n\n📋 *Invoice Summary*:\n• Status: ${ord.status}\n• Payment: ${ord.paymentStatus}\n• Total Amount: ${currencySymbol}${ord.totalAmount}\n• Advance Paid: ${currencySymbol}${ord.advancePaid}\n• Remaining Balance: ${currencySymbol}${ord.remainingBalance}\n\n🔗 *View / Print Invoice Directly*:\n${receiptUrl}\n\nThank you for choosing ${setting?.shopName || 'IntelligentLaundry'}!`;
+    const text = `Hello *${ord.customerSnapshot.name}*,\n\nYour official laundry invoice & receipt for Order *#${ord.orderNumber}* from *${setting?.shopName || 'Miracle Laundry'}* is ready!\n\n📋 *Invoice Summary*:\n• Status: ${ord.status}\n• Payment: ${ord.paymentStatus}\n• Total Amount: ${currencySymbol}${ord.totalAmount}\n• Advance Paid: ${currencySymbol}${ord.advancePaid}\n• Remaining Balance: ${currencySymbol}${ord.remainingBalance}\n\n🔗 *View / Print Invoice Directly*:\n${receiptUrl}\n\nThank you for choosing ${setting?.shopName || 'Miracle Laundry'}!`;
     const url = `https://wa.me/${mobile.length === 10 ? '91' + mobile : mobile}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -274,6 +278,27 @@ export const DashboardPage: React.FC = () => {
   const totalDashRecords = activeList.length;
   const totalDashPages = Math.ceil(totalDashRecords / dashLimit) || 1;
   const paginatedList = activeList.slice((dashPage - 1) * dashLimit, dashPage * dashLimit);
+
+  // Only render multi-branch views if Admin Mode is active (via /admin or admin link)
+  if (isAdminMode) {
+    if (selectedBranchId === 'all') {
+      return (
+        <MasterChainDashboardView
+          data={masterData}
+          onSelectBranch={(id) => setSelectedBranchId(id)}
+        />
+      );
+    }
+
+    if (selectedBranch && !selectedBranch.isSelf) {
+      return (
+        <RemoteBranchDashboardView
+          branch={selectedBranch}
+          onBackToAll={() => setSelectedBranchId('all')}
+        />
+      );
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 pb-12">

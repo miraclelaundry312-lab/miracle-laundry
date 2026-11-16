@@ -17,10 +17,13 @@ export const getApiBaseUrl = () => {
   if ((import.meta as any).env?.VITE_API_URL) {
     return (import.meta as any).env.VITE_API_URL;
   }
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:5000/api';
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'http://localhost:5000/api';
+    }
+    return window.location.origin + '/api';
   }
-  return 'https://intellingentlaundry-1.onrender.com/api';
+  return 'https://miraclelaundry-1.onrender.com/api';
 };
 
 const API_BASE = getApiBaseUrl();
@@ -119,12 +122,12 @@ export const loginApi = async (usernameOrCreds: any, passwordParam?: string) => 
       body: JSON.stringify({ username, password }),
     });
   } catch (err) {
-    if ((username === 'adminIL' && password === 'IL@112') || (username === 'admin' && password === 'admin123')) {
+    if ((username === 'adminML' && password === 'ML@112') || (username === 'adminIL' && password === 'IL@112') || (username === 'admin' && password === 'admin123')) {
       const mockAdmin: Admin = {
         id: 'admin-1',
-        username: 'adminIL',
+        username: username,
         name: 'Shop Owner',
-        email: 'owner@intelligentlaundry.com',
+        email: 'owner@miraclelaundry.com',
       };
       return { success: true, token: 'mock-jwt-token-xyz', admin: mockAdmin };
     }
@@ -142,9 +145,9 @@ export const getMe = async () => {
       success: true,
       admin: {
         id: 'admin-1',
-        username: 'adminIL',
+        username: 'adminML',
         name: 'Shop Owner',
-        email: 'owner@intelligentlaundry.com',
+        email: 'owner@miraclelaundry.com',
       },
     };
   }
@@ -698,16 +701,6 @@ export const updateOrderStatusApi = async (id: string, status: string, note?: st
   }
 };
 
-export const sendOrderWhatsAppPdfApi = async (id: string) => {
-  try {
-    return await fetchApi(`/orders/${id}/send-whatsapp-pdf`, {
-      method: 'POST',
-    });
-  } catch (err: any) {
-    return { success: false, message: err.message || 'Failed to send WhatsApp PDF' };
-  }
-};
-
 export const updateOrderApi = async (id: string, orderData: any) => {
   try {
     return await fetchApi(`/orders/${id}`, {
@@ -1172,7 +1165,13 @@ export const fetchProfitLossReport = async (params: { preset?: string; dateFrom?
 
 export const fetchSettings = async () => {
   try {
-    return await fetchApi('/settings');
+    const token = getAuthToken();
+    const endpoint = token ? '/settings' : '/settings/public';
+    const res = await fetchApi(endpoint);
+    if (res && res.success && res.setting) {
+      saveMockSettings(res.setting);
+    }
+    return res;
   } catch (err) {
     return { success: true, setting: getMockSettings() };
   }
@@ -1180,10 +1179,16 @@ export const fetchSettings = async () => {
 
 export const updateSettingsApi = async (settingsData: any) => {
   try {
-    return await fetchApi('/settings', {
+    const res = await fetchApi('/settings', {
       method: 'PUT',
       body: JSON.stringify(settingsData),
     });
+    if (res && res.success && res.setting) {
+      saveMockSettings(res.setting);
+    } else {
+      saveMockSettings(settingsData);
+    }
+    return res;
   } catch (err) {
     saveMockSettings(settingsData);
     return { success: true, setting: settingsData };
@@ -1315,11 +1320,11 @@ const getMockSettings = (): Setting => {
   const stored = localStorage.getItem('mock_settings');
   if (stored) return JSON.parse(stored);
   const initial: Setting = {
-    shopName: 'IntelligentLaundry',
-    shopTagline: 'Smart & Premium Laundry Management',
-    logoUrl: '/Intelligent Laundry.jpg.jpeg',
+    shopName: 'Miracle Laundry',
+    shopTagline: 'Laundry & Dry Cleaning Live Studio',
+    logoUrl: '/logo.jpg',
     phone: '+91 98765 43210',
-    email: 'contact@intelligentlaundry.com',
+    email: 'contact@miraclelaundry.com',
     address: '42 Commercial Street, Sector 15, Metro City, 400001',
     gstNumber: '27AABCU9603R1ZM',
     gstPercentage: 0,
@@ -1327,6 +1332,9 @@ const getMockSettings = (): Setting => {
     currencyCode: 'INR',
     invoicePrefix: 'ORD-',
     termsAndConditions: '1. Please check garments at the time of delivery.\n2. Clothes uncollected after 30 days are subject to storage charges.',
+    upiId: '9876543210@paytm',
+    gpayNumber: '9876543210',
+    paymentQrUrl: '',
   };
   localStorage.setItem('mock_settings', JSON.stringify(initial));
   return initial;
@@ -1558,22 +1566,6 @@ export const restoreMasterExcelBackupApi = async (file: File) => {
   };
 };
 
-export const fetchWhatsAppStatus = async () => {
-  try {
-    return await fetchApi('/whatsapp/status');
-  } catch (err) {
-    return { success: false, connected: false };
-  }
-};
-
-export const disconnectWhatsAppApi = async () => {
-  try {
-    return await fetchApi('/whatsapp/disconnect', { method: 'POST' });
-  } catch (err) {
-    return { success: false };
-  }
-};
-
 export const importOldAppOrdersJsonApi = async (jsonPayload: any) => {
   return await fetchApi('/backup/import-json', {
     method: 'POST',
@@ -1617,8 +1609,6 @@ export const fetchStaffPerformanceReportApi = async (params: any = {}) => {
   const query = new URLSearchParams(cleanParams).toString();
   return fetchApi(`/staff/reports?${query}`);
 };
-export const sendStaffPayslipWhatsAppApi = async (data: any) =>
-  fetchApi('/staff/send-payslip-whatsapp', { method: 'POST', body: JSON.stringify(data) });
 export const downloadStaffPayslipPdfApi = async (data: any) => {
   const token = getAuthToken();
   const response = await fetch(`${API_BASE}/staff/download-payslip-pdf`, {
@@ -1697,4 +1687,50 @@ export const prefetchAllAppData = async () => {
   } catch (err) {
     console.error('Background pre-warming error:', err);
   }
+};
+
+
+// ==========================================
+// MASTER ADMIN & MULTI-BRANCH HQ API
+// ==========================================
+export const fetchMasterAdminDashboardApi = async () => {
+  return fetchApi('/master-admin/dashboard');
+};
+
+export const fetchMasterBranchesApi = async () => {
+  return fetchApi('/master-admin/branches');
+};
+
+export const addMasterBranchApi = async (data: any) => {
+  return fetchApi('/master-admin/branches', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateMasterBranchApi = async (id: string, data: any) => {
+  return fetchApi(`/master-admin/branches/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteMasterBranchApi = async (id: string) => {
+  return fetchApi(`/master-admin/branches/${id}`, {
+    method: 'DELETE',
+  });
+};
+
+export const testBranchConnectionApi = async (url: string, apiKey?: string) => {
+  return fetchApi('/master-admin/branches/test', {
+    method: 'POST',
+    body: JSON.stringify({ url, apiKey }),
+  });
+};
+
+export const broadcastPricingApi = async (payload: { services: any[]; promoNote?: string }) => {
+  return fetchApi('/master-admin/broadcast-pricing', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 };

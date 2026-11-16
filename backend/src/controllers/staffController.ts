@@ -3,7 +3,6 @@ import Staff from '../models/Staff';
 import Attendance from '../models/Attendance';
 import IroningWorkLog from '../models/IroningWorkLog';
 import Setting from '../models/Setting';
-import { sendAutomatedWhatsAppDocument } from '../services/whatsappGateway';
 import { generatePayslipPDFBuffer } from '../utils/pdfGenerator';
 
 // -------------------------------------------------------------
@@ -341,87 +340,7 @@ export const getStaffPerformanceReport = async (req: Request, res: Response) => 
 };
 
 // -------------------------------------------------------------
-// 5. Send Staff Payslip PDF Directly via WhatsApp
-// -------------------------------------------------------------
-export const sendStaffPayslipWhatsApp = async (req: Request, res: Response) => {
-  try {
-    const {
-      mobile,
-      staffName,
-      role,
-      payPeriod,
-      presentDays,
-      absentDays,
-      baseSalary,
-      overtimeBonus,
-      advanceDeduction,
-      weeklyPayouts,
-      totalWeeklyPaid,
-      otherDeduction,
-      grossEarnings,
-      totalDeductions,
-      netPayable,
-      paymentStatus,
-      paymentMode,
-      paymentDate,
-    } = req.body;
-
-    if (!mobile) {
-      return res.status(400).json({ success: false, message: 'Staff mobile number is required' });
-    }
-
-    const settings = await Setting.findOne({});
-
-    const payslipData = {
-      staffName: staffName || 'Staff',
-      role: role || 'Staff',
-      mobile: mobile,
-      payPeriod: payPeriod || 'Current Month',
-      presentDays: Number(presentDays || 0),
-      absentDays: Number(absentDays || 0),
-      baseSalary: Number(baseSalary || 0),
-      overtimeBonus: Number(overtimeBonus || 0),
-      advanceDeduction: Number(advanceDeduction || 0),
-      weeklyPayouts: Array.isArray(weeklyPayouts) ? weeklyPayouts : [],
-      totalWeeklyPaid: Number(totalWeeklyPaid || 0),
-      otherDeduction: Number(otherDeduction || 0),
-      grossEarnings: Number(grossEarnings || 0),
-      totalDeductions: Number(totalDeductions || 0),
-      netPayable: Number(netPayable || 0),
-      paymentStatus: paymentStatus || 'Paid',
-      paymentMode: paymentMode || 'Cash',
-      paymentDate: paymentDate || new Date().toISOString().split('T')[0],
-    };
-
-    // Generate Payslip PDF Buffer
-    const pdfBuffer = await generatePayslipPDFBuffer(payslipData, settings);
-    const cleanStaffName = (staffName || 'Staff').replace(/[^a-zA-Z0-9]/g, '_');
-    const cleanPeriod = (payPeriod || 'Payslip').replace(/[^a-zA-Z0-9]/g, '_');
-    const fileName = `Payslip_${cleanStaffName}_${cleanPeriod}.pdf`;
-
-    // Send ONLY the PDF document attachment over WhatsApp (no message text)
-    const sent = await sendAutomatedWhatsAppDocument(mobile, pdfBuffer, fileName);
-
-    if (sent) {
-      return res.json({
-        success: true,
-        message: `Payslip PDF sent directly to +${mobile} via WhatsApp!`,
-      });
-    } else {
-      return res.json({
-        success: false,
-        gatewayConnected: false,
-        message: 'WhatsApp Gateway socket is offline. Opening WhatsApp Web/App directly with downloaded PDF.',
-      });
-    }
-  } catch (error: any) {
-    console.error('Error sending staff payslip via WhatsApp:', error);
-    return res.status(500).json({ success: false, message: error.message || 'Internal server error' });
-  }
-};
-
-// -------------------------------------------------------------
-// 6. Generate & Download Staff Payslip PDF Endpoint
+// 5. Generate & Download Staff Payslip PDF Endpoint
 // -------------------------------------------------------------
 export const downloadStaffPayslipPDF = async (req: Request, res: Response) => {
   try {

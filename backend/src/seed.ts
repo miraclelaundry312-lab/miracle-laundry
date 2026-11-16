@@ -6,6 +6,7 @@ import Admin from './models/Admin';
 import Service from './models/Service';
 import LaundryItem from './models/LaundryItem';
 import Setting from './models/Setting';
+import BranchRegistry from './models/BranchRegistry';
 
 dotenv.config();
 
@@ -20,19 +21,19 @@ export const seedDatabase = async () => {
     console.log('[SEED] Starting database seeding process...');
 
     // 1. Seed Admin
-    let admin = await Admin.findOne({ username: 'adminIL' });
+    let admin = await Admin.findOne({ username: 'adminML' });
     if (!admin) {
-      await Admin.deleteMany({ username: 'admin' });
-      const hashedPassword = await bcrypt.hash('IL@112', 10);
+      await Admin.deleteMany({ username: { $in: ['admin', 'adminIL'] } });
+      const hashedPassword = await bcrypt.hash('ML@112', 10);
       await Admin.create({
-        username: 'adminIL',
+        username: 'adminML',
         password: hashedPassword,
         name: 'Shop Owner',
-        email: 'owner@intelligentlaundry.com',
+        email: 'owner@miraclelaundry.com',
       });
-      console.log('[SEED] Default admin created (username: adminIL, password: IL@112)');
+      console.log('[SEED] Default admin created (username: adminML, password: ML@112)');
     } else {
-      const hashedPassword = await bcrypt.hash('IL@112', 10);
+      const hashedPassword = await bcrypt.hash('ML@112', 10);
       admin.password = hashedPassword;
       await admin.save();
     }
@@ -41,11 +42,11 @@ export const seedDatabase = async () => {
     let setting = await Setting.findOne();
     if (!setting) {
       setting = await Setting.create({
-        shopName: 'IntelligentLaundry & Dry Cleaners',
-        shopTagline: 'Smart & Premium Laundry Management',
-        logoUrl: 'https://images.unsplash.com/photo-1545173168-9f1947eebb7f?w=200&auto=format&fit=crop&q=80',
+        shopName: 'Miracle Laundry & Dry Cleaners',
+        shopTagline: 'Laundry & Dry Cleaning Live Studio',
+        logoUrl: '/logo.jpg',
         phone: '+91 98765 43210',
-        email: 'support@intelligentlaundry.com',
+        email: 'support@miraclelaundry.com',
         address: '42 Commercial Street, Sector 15, Metro City, 400001',
         gstNumber: '27AABCU9603R1ZM',
         gstPercentage: 0,
@@ -81,6 +82,25 @@ export const seedDatabase = async () => {
       ];
       await Service.insertMany(defaultServices);
       console.log('[SEED] Default laundry services seeded.');
+    }
+
+    // 4. Seed Default Self Branch (Miracle Laundry 1)
+    const branchCount = await BranchRegistry.countDocuments();
+    if (branchCount === 0) {
+      await BranchRegistry.create({
+        name: 'Miracle Laundry 1',
+        code: 'ML-01',
+        url: process.env.RENDER_EXTERNAL_URL || process.env.BACKEND_URL || 'http://localhost:5000',
+        apiKey: process.env.BRANCH_API_KEY || 'miracle-secret-key-2026',
+        location: 'Main Studio & HQ',
+        phone: setting?.phone || '+91 98765 43210',
+        managerName: 'HQ Manager',
+        isSelf: true,
+        isActive: true,
+        lastStatus: 'online',
+        notes: 'Primary HQ Branch',
+      });
+      console.log('[SEED] Primary branch (Miracle Laundry 1) registered in BranchRegistry.');
     }
 
     console.log('[SEED] Database seeding complete!');

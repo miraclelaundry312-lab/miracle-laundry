@@ -20,7 +20,7 @@ services:
       - "5000:5000"
     environment:
       - PORT=5000
-      - MONGODB_URI=mongodb://mongodb:27017/laundry_db
+      - MONGODB_URI=mongodb://mongodb:27017/miracle_laundry_db
       - JWT_SECRET=laundry_shop_super_secret_jwt_key_2026
       - NODE_ENV=production
     depends_on:

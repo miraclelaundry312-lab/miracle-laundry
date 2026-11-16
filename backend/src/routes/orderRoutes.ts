@@ -3,7 +3,6 @@ import {
   getOrders,
   getOrderById,
   getOrderPDF,
-  sendOrderWhatsAppPDF,
   getPublicOrderByNumber,
   createOrder,
   updateOrder,
@@ -31,7 +30,6 @@ router.post('/fix-order-412', fixOrder412);
 router.get('/', getOrders);
 router.get('/:id', getOrderById);
 router.get('/:id/pdf', getOrderPDF);
-router.post('/:id/send-whatsapp-pdf', sendOrderWhatsAppPDF);
 router.post('/', createOrder);
 router.put('/:id', updateOrder);
 router.patch('/:id/status', updateOrderStatus);

@@ -11,10 +11,8 @@ const toAmount = (val: any): string => {
 export const generateInvoicePDFBuffer = async (order: any, setting?: any): Promise<Buffer> => {
   // Generate QR Code PNG Buffer
   let qrBuffer: Buffer | null = null;
-  const upiId = setting?.upiId || 'intelligentno1laundry@gmail.com';
-  const shopName = setting?.shopName && setting.shopName !== 'IntelligentLaundry & Dry Cleaners'
-    ? setting.shopName
-    : 'Intelligent Laundry';
+  const upiId = setting?.upiId || 'miraclelaundry@gmail.com';
+  const shopName = setting?.shopName || 'Miracle Laundry';
   const dueAmount = (order.remainingBalance && order.remainingBalance > 0) ? order.remainingBalance : order.totalAmount;
   const upiPaymentUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shopName)}&am=${dueAmount}&cu=INR&tn=${encodeURIComponent('Order #' + order.orderNumber)}`;
 
@@ -44,7 +42,7 @@ export const generateInvoicePDFBuffer = async (order: any, setting?: any): Promi
 
       const address = setting?.address || '2/516 B Thiruvalluvar Nagar, Near ambal hospital, Malumichampatti, Coimbatore 641050';
       const phone = setting?.phone || '+91 98765 43210';
-      const email = setting?.email || 'intelligentno1laundry@gmail.com';
+      const email = setting?.email || 'contact@miraclelaundry.com';
       const gstNumber = setting?.gstNumber || '';
 
       // Check for store logo image
@@ -52,6 +50,8 @@ export const generateInvoicePDFBuffer = async (order: any, setting?: any): Promi
         path.join(process.cwd(), '../frontend/public/logo.jpg'),
         path.join(process.cwd(), 'public/logo.jpg'),
         path.join(process.cwd(), '../frontend/public/logo.png'),
+        path.join(process.cwd(), 'public/logo.png'),
+        path.join(process.cwd(), '../frontend/public/ML_logo.jpeg'),
       ];
       let logoPath: string | null = null;
       for (const p of possibleLogoPaths) {
@@ -69,14 +69,14 @@ export const generateInvoicePDFBuffer = async (order: any, setting?: any): Promi
         try {
           doc.image(logoPath, 40, headerY, { width: 45, height: 45 });
           doc.fontSize(20).fillColor('#0369a1').font('Helvetica-Bold').text(shopName, 95, headerY + 2);
-          doc.fontSize(8.5).fillColor('#64748b').font('Helvetica').text('Smart & Premium Laundry Management', 95, headerY + 24);
+          doc.fontSize(8.5).fillColor('#64748b').font('Helvetica').text('Laundry & Dry Cleaning Live Studio', 95, headerY + 24);
         } catch (e) {
           doc.fontSize(20).fillColor('#0369a1').font('Helvetica-Bold').text(shopName, 40, headerY);
-          doc.fontSize(8.5).fillColor('#64748b').font('Helvetica').text('Smart & Premium Laundry Management', 40, headerY + 22);
+          doc.fontSize(8.5).fillColor('#64748b').font('Helvetica').text('Laundry & Dry Cleaning Live Studio', 40, headerY + 22);
         }
       } else {
         doc.fontSize(20).fillColor('#0369a1').font('Helvetica-Bold').text(shopName, 40, headerY);
-        doc.fontSize(8.5).fillColor('#64748b').font('Helvetica').text('Smart & Premium Laundry Management', 40, headerY + 22);
+        doc.fontSize(8.5).fillColor('#64748b').font('Helvetica').text('Laundry & Dry Cleaning Live Studio', 40, headerY + 22);
       }
 
       // Store Details under header
@@ -169,6 +169,27 @@ export const generateInvoicePDFBuffer = async (order: any, setting?: any): Promi
       // Calculation Summary Box
       tableY += 15;
 
+      // Left: Payment QR Code & UPI Transfer Info
+      if (qrBuffer) {
+        try {
+          doc.rect(40, tableY, 290, 88).fill('#f8fafc').stroke('#e2e8f0');
+          doc.image(qrBuffer, 48, tableY + 6, { width: 75, height: 75 });
+          doc.fontSize(8.5).fillColor('#0284c7').font('Helvetica-Bold').text('SCAN TO PAY VIA UPI', 132, tableY + 10);
+          doc.fontSize(7.5).fillColor('#334155').font('Helvetica');
+          if (setting?.upiId) {
+            doc.text(`UPI ID: ${setting.upiId}`, 132, tableY + 24, { width: 190 });
+          }
+          const gpayNum = setting?.gpayNumber || setting?.phone;
+          if (gpayNum) {
+            doc.text(`GPay / PhonePe: ${gpayNum}`, 132, tableY + 36, { width: 190 });
+          }
+          doc.text(`Due Amount: Rs. ${toAmount(dueAmount)}`, 132, tableY + 48, { width: 190 });
+          doc.fontSize(7).fillColor('#94a3b8').text('Scan via GPay, PhonePe, Paytm or any UPI App', 132, tableY + 62, { width: 190 });
+        } catch (e) {
+          console.error('Failed to draw QR in PDF:', e);
+        }
+      }
+
       // Right: Financial Summary Breakdown
       const summaryLeft = 360;
       let sumY = tableY;
@@ -213,10 +234,20 @@ export const generateInvoicePDFBuffer = async (order: any, setting?: any): Promi
       doc.moveTo(40, footerY - 10).lineTo(555, footerY - 10).strokeColor('#e2e8f0').lineWidth(1).stroke();
       doc.fontSize(9).fillColor('#0284c7').font('Helvetica-Bold').text(`Thank you for choosing ${shopName}!`, 40, footerY, { align: 'center' });
       
-      doc.fontSize(7.5).fillColor('#475569').font('Helvetica');
-      doc.text('1. Please inspect clothes upon delivery.', 40, footerY + 14, { align: 'center' });
-      doc.text('2. Clothes not collected within 30 days are subject to storage charges.', 40, footerY + 25, { align: 'center' });
-      doc.text('3. Colors may bleed on delicate items if not pre-informed.', 40, footerY + 36, { align: 'center' });
+      if (setting?.termsAndConditions) {
+        doc.fontSize(7.5).fillColor('#475569').font('Helvetica');
+        const termsLines = setting.termsAndConditions.split('\n').filter((l: string) => l.trim().length > 0);
+        let tY = footerY + 14;
+        termsLines.slice(0, 3).forEach((line: string) => {
+          doc.text(line.trim(), 40, tY, { align: 'center', width: 515 });
+          tY += 11;
+        });
+      } else {
+        doc.fontSize(7.5).fillColor('#475569').font('Helvetica');
+        doc.text('1. Please inspect clothes upon delivery.', 40, footerY + 14, { align: 'center' });
+        doc.text('2. Clothes not collected within 30 days are subject to storage charges.', 40, footerY + 25, { align: 'center' });
+        doc.text('3. Colors may bleed on delicate items if not pre-informed.', 40, footerY + 36, { align: 'center' });
+      }
 
       doc.end();
     } catch (error) {
@@ -256,10 +287,10 @@ export const generatePayslipPDFBuffer = async (data: IPayslipData, setting?: any
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', (err) => reject(err));
 
-      const shopName = setting?.storeName || setting?.shopName || setting?.companyName || 'INTELLIGENT LAUNDRY & DRY CLEANERS';
+      const shopName = setting?.storeName || setting?.shopName || setting?.companyName || 'MIRACLE LAUNDRY & DRY CLEANERS';
       const address = setting?.address || '123 Commercial Main Road, City Plaza, Sector 4';
       const phone = setting?.mobile || setting?.phone || '+91 98765 43210';
-      const email = setting?.email || 'contact@intelligentlaundry.com';
+      const email = setting?.email || 'contact@miraclelaundry.com';
 
       // Header
       let y = 45;

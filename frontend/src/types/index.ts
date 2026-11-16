@@ -214,3 +214,84 @@ export interface AccountsSummary {
   bankExpenses: number;
 }
 
+
+export interface BranchRegistry {
+  _id: string;
+  name: string;
+  code: string;
+  url: string;
+  apiKey?: string;
+  location?: string;
+  phone?: string;
+  managerName?: string;
+  isSelf: boolean;
+  isActive: boolean;
+  notes?: string;
+  lastSyncedAt?: string;
+  lastStatus?: 'online' | 'offline' | 'untested';
+  lastPingMs?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface BranchSummaryStats {
+  branchName: string;
+  branchCode: string;
+  currencySymbol: string;
+  todaySales: number;
+  monthSales: number;
+  totalRevenue: number;
+  totalOrders: number;
+  activeOrders: number;
+  deliveredToday: number;
+  totalCustomers: number;
+  pendingBalance: number;
+  recentOrders?: any[];
+  statusBreakdown?: Record<string, number>;
+  dailySalesHistory?: { date: string; amount: number }[];
+}
+
+export interface BranchDataNode {
+  _id: string;
+  name: string;
+  code: string;
+  url: string;
+  location?: string;
+  phone?: string;
+  managerName?: string;
+  isSelf: boolean;
+  isActive: boolean;
+  status: 'online' | 'offline';
+  pingMs?: number;
+  error?: string;
+  summary: BranchSummaryStats | null;
+}
+
+export interface MasterDashboardData {
+  success: boolean;
+  networkTotals: {
+    totalRevenue: number;
+    todaySales: number;
+    monthSales: number;
+    totalOrders: number;
+    activeOrders: number;
+    deliveredToday: number;
+    totalPendingBalance: number;
+    totalCustomers: number;
+    onlineBranches: number;
+    totalBranches: number;
+  };
+  branchesData: BranchDataNode[];
+  branchComparison: {
+    name: string;
+    code: string;
+    todaySales: number;
+    monthSales: number;
+    totalRevenue: number;
+    totalOrders: number;
+    activeOrders: number;
+    sharePercentage: number;
+  }[];
+  recentNetworkOrders: any[];
+  lastUpdated: string;
+}

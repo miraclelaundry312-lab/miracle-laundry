@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-const uri = process.env.MONGODB_URI || 'mongodb+srv://admin:Ldshop123@cluster0.uvtjm9e.mongodb.net/intelligentlaundry?retryWrites=true&w=majority';
+const uri = process.env.MONGODB_URI || 'mongodb+srv://miracle-laundry:miracle-laundry-pw@cluster0.0spegqu.mongodb.net/miraclelaundry?retryWrites=true&w=majority';
 
 mongoose.connect(uri).then(async () => {
   const db = mongoose.connection.db;
