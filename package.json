@@ -4,8 +4,8 @@
   "private": true,
   "description": "Miracle Laundry POS & ERP Management System",
   "scripts": {
-    "build:backend": "cd backend && npm install && npm run build",
-    "build:frontend": "cd frontend && npm install && npm run build",
+    "build:backend": "cd backend && npm install --include=dev && npm run build",
+    "build:frontend": "cd frontend && npm install --include=dev && npm run build",
     "build": "npm run build:backend && npm run build:frontend",
     "start": "cd backend && npm start"
   }

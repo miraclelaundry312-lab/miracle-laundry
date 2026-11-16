@@ -28,9 +28,7 @@
     "pdfkit": "^0.19.1",
     "qrcode": "^1.5.3",
     "typescript": "^5.5.3",
+    "tsx": "^4.16.2",
     "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "tsx": "^4.16.2"
   }
 }
